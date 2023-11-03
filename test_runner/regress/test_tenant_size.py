@@ -692,16 +692,11 @@ def mask_model_inputs(x):
                 else:
                     newx[k] = ">0"
             elif k.endswith("lsn") or k.endswith("cutoff") or k == "last_record":
-                if v is None or v == 0 or v == "0/0":
-                    # no change
-                    newx[k] = v
-                else:
-                    newx[k] = "masked"
+                newx[k] = v if v is None or v == 0 or v == "0/0" else "masked"
             else:
                 newx[k] = mask_model_inputs(v)
         return newx
     elif isinstance(x, list):
-        newlist = [mask_model_inputs(v) for v in x]
-        return newlist
+        return [mask_model_inputs(v) for v in x]
     else:
         return x

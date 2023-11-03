@@ -531,12 +531,12 @@ def test_ignored_tenant_reattach(neon_env_builder: NeonEnvBuilder):
         timeline["timeline_id"]
         for timeline in pageserver_http.timeline_list(tenant_id=ignored_tenant_id)
     ]
-    files_before_ignore = [tenant_path for tenant_path in tenant_dir.glob("**/*")]
+    files_before_ignore = list(tenant_dir.glob("**/*"))
 
     # ignore the tenant and veirfy it's not present in pageserver replies, with its files still on disk
     pageserver_http.tenant_ignore(ignored_tenant_id)
 
-    files_after_ignore_with_retain = [tenant_path for tenant_path in tenant_dir.glob("**/*")]
+    files_after_ignore_with_retain = list(tenant_dir.glob("**/*"))
     new_files = set(files_after_ignore_with_retain) - set(files_before_ignore)
     disappeared_files = set(files_before_ignore) - set(files_after_ignore_with_retain)
     assert (
@@ -794,7 +794,7 @@ def test_metrics_while_ignoring_broken_tenant_and_reloading(
     def only_int(samples: List[Sample]) -> Optional[int]:
         if len(samples) == 1:
             return int(samples[0].value)
-        assert len(samples) == 0
+        assert not samples
         return None
 
     wait_until_tenant_state(client, env.initial_tenant, "Active", 10, 0.5)
