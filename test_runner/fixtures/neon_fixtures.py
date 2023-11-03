@@ -152,9 +152,8 @@ def versioned_pg_distrib_dir(pg_distrib_dir: Path, pg_version: PgVersion) -> Ite
         # When testing against a remote server, we only need the client binary.
         if not psql_bin_path.exists():
             raise Exception(f"psql not found at '{psql_bin_path}'")
-    else:
-        if not postgres_bin_path.exists():
-            raise Exception(f"postgres not found at '{postgres_bin_path}'")
+    elif not postgres_bin_path.exists():
+        raise Exception(f"postgres not found at '{postgres_bin_path}'")
 
     log.info(f"versioned_pg_distrib_dir is {versioned_dir}")
     yield versioned_dir
@@ -619,46 +618,47 @@ class NeonEnvBuilder:
         traceback: Optional[TracebackType],
     ):
         # Stop all the nodes.
-        if self.env:
-            log.info("Cleaning up all storage and compute nodes")
-            self.env.endpoints.stop_all()
-            for sk in self.env.safekeepers:
-                sk.stop(immediate=True)
+        if not self.env:
+            return
+        log.info("Cleaning up all storage and compute nodes")
+        self.env.endpoints.stop_all()
+        for sk in self.env.safekeepers:
+            sk.stop(immediate=True)
 
-            for pageserver in self.env.pageservers:
-                pageserver.stop(immediate=True)
+        for pageserver in self.env.pageservers:
+            pageserver.stop(immediate=True)
 
-            if self.env.attachment_service is not None:
-                self.env.attachment_service.stop(immediate=True)
+        if self.env.attachment_service is not None:
+            self.env.attachment_service.stop(immediate=True)
 
-            cleanup_error = None
+        cleanup_error = None
 
-            if self.scrub_on_exit:
-                try:
-                    S3Scrubber(self.test_output_dir, self).scan_metadata()
-                except Exception as e:
-                    log.error(f"Error during remote storage scrub: {e}")
-                    cleanup_error = e
-
+        if self.scrub_on_exit:
             try:
-                self.cleanup_remote_storage()
+                S3Scrubber(self.test_output_dir, self).scan_metadata()
             except Exception as e:
-                log.error(f"Error during remote storage cleanup: {e}")
-                if cleanup_error is not None:
-                    cleanup_error = e
+                log.error(f"Error during remote storage scrub: {e}")
+                cleanup_error = e
 
-            try:
-                self.cleanup_local_storage()
-            except Exception as e:
-                log.error(f"Error during local storage cleanup: {e}")
-                if cleanup_error is not None:
-                    cleanup_error = e
-
+        try:
+            self.cleanup_remote_storage()
+        except Exception as e:
+            log.error(f"Error during remote storage cleanup: {e}")
             if cleanup_error is not None:
-                raise cleanup_error
+                cleanup_error = e
 
-            for pageserver in self.env.pageservers:
-                pageserver.assert_no_errors()
+        try:
+            self.cleanup_local_storage()
+        except Exception as e:
+            log.error(f"Error during local storage cleanup: {e}")
+            if cleanup_error is not None:
+                cleanup_error = e
+
+        if cleanup_error is not None:
+            raise cleanup_error
+
+        for pageserver in self.env.pageservers:
+            pageserver.assert_no_errors()
 
 
 class NeonEnv:
@@ -884,7 +884,7 @@ class NeonEnv:
         Generate a unique endpoint ID
         """
         self.endpoint_counter += 1
-        return "ep-" + str(self.endpoint_counter)
+        return f"ep-{self.endpoint_counter}"
 
 
 @pytest.fixture(scope=shareable_scope)
@@ -1059,7 +1059,7 @@ class AbstractNeonCli(abc.ABC):
             bin_neon = str(self.env.neon_binpath / self.COMMAND)
 
         args = [bin_neon] + arguments
-        log.info('Running command "{}"'.format(" ".join(args)))
+        log.info(f'Running command "{" ".join(args)}"')
         log.info(f'Running in "{self.env.repo_dir}"')
 
         env_vars = os.environ.copy()
@@ -1072,8 +1072,7 @@ class AbstractNeonCli(abc.ABC):
 
         # Pass coverage settings
         var = "LLVM_PROFILE_FILE"
-        val = os.environ.get(var)
-        if val:
+        if val := os.environ.get(var):
             env_vars[var] = val
 
         # Intercept CalledProcessError and print more info
@@ -1097,7 +1096,7 @@ class AbstractNeonCli(abc.ABC):
                 log.debug("Run %s success:\n%s" % (res.args, textwrap.indent(stripped, indent)))
         elif check_return_code:
             # this way command output will be in recorded and shown in CI in failure message
-            indent = indent * 2
+            indent *= 2
             msg = textwrap.dedent(
                 """\
             Run %s failed:
@@ -1216,10 +1215,7 @@ class NeonCli(AbstractNeonCli):
 
         matches = CREATE_TIMELINE_ID_EXTRACTOR.search(res.stdout)
 
-        created_timeline_id = None
-        if matches is not None:
-            created_timeline_id = matches.group("timeline_id")
-
+        created_timeline_id = None if matches is None else matches.group("timeline_id")
         return TimelineId(str(created_timeline_id))
 
     def create_branch(
@@ -1247,10 +1243,7 @@ class NeonCli(AbstractNeonCli):
 
         matches = CREATE_TIMELINE_ID_EXTRACTOR.search(res.stdout)
 
-        created_timeline_id = None
-        if matches is not None:
-            created_timeline_id = matches.group("timeline_id")
-
+        created_timeline_id = None if matches is None else matches.group("timeline_id")
         if created_timeline_id is None:
             raise Exception("could not find timeline id after `neon timeline create` invocation")
         else:
@@ -1266,13 +1259,15 @@ class NeonCli(AbstractNeonCli):
         res = self.raw_cli(
             ["timeline", "list", "--tenant-id", str(tenant_id or self.env.initial_tenant)]
         )
-        timelines_cli = sorted(
+        return sorted(
             map(
-                lambda branch_and_id: (branch_and_id[0], TimelineId(branch_and_id[1])),
+                lambda branch_and_id: (
+                    branch_and_id[0],
+                    TimelineId(branch_and_id[1]),
+                ),
                 TIMELINE_DATA_EXTRACTOR.findall(res.stdout),
             )
         )
-        return timelines_cli
 
     def init(
         self,
@@ -1344,10 +1339,7 @@ class NeonCli(AbstractNeonCli):
         if isinstance(self.env.safekeepers_remote_storage, S3Storage):
             s3_env_vars = self.env.safekeepers_remote_storage.access_env_vars()
 
-        if extra_opts is not None:
-            extra_opts = [f"-e={opt}" for opt in extra_opts]
-        else:
-            extra_opts = []
+        extra_opts = [] if extra_opts is None else [f"-e={opt}" for opt in extra_opts]
         return self.raw_cli(
             ["safekeeper", "start", str(id), *extra_opts], extra_env_vars=s3_env_vars
         )
@@ -1424,9 +1416,7 @@ class NeonCli(AbstractNeonCli):
             args.extend(["--remote-ext-config", remote_ext_config])
         if lsn is not None:
             args.append(f"--lsn={lsn}")
-        args.extend(["--pg-port", str(pg_port)])
-        args.extend(["--http-port", str(http_port)])
-
+        args.extend(["--pg-port", str(pg_port), "--http-port", str(http_port)])
         if safekeepers is not None:
             args.extend(["--safekeepers", (",".join(map(str, safekeepers)))])
         if branch_name is not None:
@@ -2777,7 +2767,7 @@ class Safekeeper:
         return self
 
     def stop(self, immediate: bool = False) -> "Safekeeper":
-        log.info("Stopping safekeeper {}".format(self.id))
+        log.info(f"Stopping safekeeper {self.id}")
         self.env.neon_cli.safekeeper_stop(self.id, immediate)
         self.running = False
         return self
@@ -2802,7 +2792,7 @@ class Safekeeper:
             with conn.cursor() as cur:
                 request_json = json.dumps(request)
                 log.info(f"JSON_CTRL request on port {self.port.pg}: {request_json}")
-                cur.execute("JSON_CTRL " + request_json)
+                cur.execute(f"JSON_CTRL {request_json}")
                 all = cur.fetchall()
                 log.info(f"JSON_CTRL response: {all[0][0]}")
                 res = json.loads(all[0][0])
@@ -2979,7 +2969,7 @@ class S3Scrubber:
         env.update(s3_storage.access_env_vars())
 
         if s3_storage.endpoint is not None:
-            env.update({"AWS_ENDPOINT_URL": s3_storage.endpoint})
+            env["AWS_ENDPOINT_URL"] = s3_storage.endpoint
 
         base_args = [self.env.neon_binpath / "s3_scrubber"]
         args = base_args + args
@@ -3181,13 +3171,13 @@ def check_restored_datadir_content(
     for f in mismatch:
         f1 = os.path.join(endpoint.pgdata_dir, f)
         f2 = os.path.join(restored_dir_path, f)
-        stdout_filename = "{}.filediff".format(f2)
+        stdout_filename = f"{f2}.filediff"
 
         with open(stdout_filename, "w") as stdout_f:
-            subprocess.run("xxd -b {} > {}.hex ".format(f1, f1), shell=True)
-            subprocess.run("xxd -b {} > {}.hex ".format(f2, f2), shell=True)
+            subprocess.run(f"xxd -b {f1} > {f1}.hex ", shell=True)
+            subprocess.run(f"xxd -b {f2} > {f2}.hex ", shell=True)
 
-            cmd = "diff {}.hex {}.hex".format(f1, f2)
+            cmd = f"diff {f1}.hex {f2}.hex"
             subprocess.run([cmd], stdout=stdout_f, shell=True)
 
     assert (mismatch, error) == ([], [])
@@ -3197,10 +3187,9 @@ def logical_replication_sync(subscriber: VanillaPostgres, publisher: Endpoint) -
     """Wait logical replication subscriber to sync with publisher."""
     publisher_lsn = Lsn(publisher.safe_psql("SELECT pg_current_wal_flush_lsn()")[0][0])
     while True:
-        res = subscriber.safe_psql("select latest_end_lsn from pg_catalog.pg_stat_subscription")[0][
-            0
-        ]
-        if res:
+        if res := subscriber.safe_psql(
+            "select latest_end_lsn from pg_catalog.pg_stat_subscription"
+        )[0][0]:
             log.info(f"subscriber_lsn={res}")
             subscriber_lsn = Lsn(res)
             log.info(f"Subscriber LSN={subscriber_lsn}, publisher LSN={ publisher_lsn}")

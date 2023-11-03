@@ -265,7 +265,7 @@ def _import(
     query = f"fullbackup { env.initial_tenant} {timeline} {lsn}"
     cmd = ["psql", "--no-psqlrc", env.pageserver.connstr(), "-c", query]
     result_basepath = pg_bin.run_capture(cmd, env=psql_env)
-    tar_output_file = result_basepath + ".stdout"
+    tar_output_file = f"{result_basepath}.stdout"
 
     # Stop the first pageserver instance, erase all its data
     env.endpoints.stop_all()
@@ -317,7 +317,7 @@ def _import(
     query = f"fullbackup { tenant} {timeline} {lsn}"
     cmd = ["psql", "--no-psqlrc", env.pageserver.connstr(), "-c", query]
     result_basepath = pg_bin.run_capture(cmd, env=psql_env)
-    new_tar_output_file = result_basepath + ".stdout"
+    new_tar_output_file = f"{result_basepath}.stdout"
 
     # Check it's the same as the first fullbackup
     # TODO pageserver should be checking checksum

@@ -200,14 +200,14 @@ def test_generations_upgrade(neon_env_builder: NeonEnvBuilder):
         m = re.match(".+-([0-9a-zA-Z]{8})$", key)
         if m is None:
             return None
-        else:
-            log.info(f"match: {m}")
-            log.info(f"group: {m.group(1)}")
-            return int(m.group(1), 16)
+        log.info(f"match: {m}")
+        log.info(f"group: {m.group(1)}")
+        return int(m.group(1), 16)
 
-    pre_upgrade_keys = list(
-        [o["Key"] for o in list_prefix(neon_env_builder, delimiter="")["Contents"]]
-    )
+    pre_upgrade_keys = [
+        o["Key"]
+        for o in list_prefix(neon_env_builder, delimiter="")["Contents"]
+    ]
     for key in pre_upgrade_keys:
         assert parse_generation_suffix(key) is None
 
@@ -220,9 +220,10 @@ def test_generations_upgrade(neon_env_builder: NeonEnvBuilder):
 
     legacy_objects: list[str] = []
     suffixed_objects = []
-    post_upgrade_keys = list(
-        [o["Key"] for o in list_prefix(neon_env_builder, delimiter="")["Contents"]]
-    )
+    post_upgrade_keys = [
+        o["Key"]
+        for o in list_prefix(neon_env_builder, delimiter="")["Contents"]
+    ]
     for key in post_upgrade_keys:
         log.info(f"post-upgrade key: {key}")
         if parse_generation_suffix(key) is not None:
@@ -231,8 +232,8 @@ def test_generations_upgrade(neon_env_builder: NeonEnvBuilder):
             legacy_objects.append(key)
 
     # Bucket now contains a mixture of suffixed and non-suffixed objects
-    assert len(suffixed_objects) > 0
-    assert len(legacy_objects) > 0
+    assert suffixed_objects
+    assert legacy_objects
 
     assert get_deletion_queue_unexpected_errors(env.pageserver.http_client()) == 0
 

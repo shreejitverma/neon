@@ -93,13 +93,7 @@ def test_metric_collection(
     def get_num_remote_ops(file_kind: str, op_kind: str) -> int:
         ps_metrics = env.pageserver.http_client().get_metrics()
         total = 0.0
-        for sample in ps_metrics.query_all(
-            name="pageserver_remote_operation_seconds_count",
-            filter={
-                "file_kind": str(file_kind),
-                "op_kind": str(op_kind),
-            },
-        ):
+        for sample in ps_metrics.query_all(name="pageserver_remote_operation_seconds_count", filter={"file_kind": file_kind, "op_kind": op_kind}):
             total += sample[2]
         return int(total)
 
@@ -284,7 +278,7 @@ def test_metric_collection_cleans_up_tempfile(
 
     # it is possible we shutdown the pageserver right at the correct time, so the old tempfile
     # is gone, but we also have a new one.
-    only = set(["last_consumption_metrics.json"])
+    only = {"last_consumption_metrics.json"}
     assert (
         initially.matching.intersection(later.matching) == only
     ), "only initial tempfile should had been removed"
@@ -326,7 +320,6 @@ class MetricsVerifier:
 
     def __init__(self):
         self.tenants: Dict[TenantId, TenantMetricsVerifier] = {}
-        pass
 
     def ingest(self, events, is_last):
         stringified = json.dumps(events, indent=2)
@@ -419,7 +412,6 @@ class CannotVerifyAnything:
 class WrittenDataVerifier:
     def __init__(self):
         self.values = []
-        pass
 
     def ingest(self, event, parent):
         self.values.append(event["value"])
@@ -433,7 +425,6 @@ class WrittenDataDeltaVerifier:
         self.value = None
         self.sum = 0
         self.timerange = None
-        pass
 
     def ingest(self, event, parent):
         assert event["type"] == "incremental"
@@ -463,7 +454,6 @@ class SyntheticSizeVerifier:
     def __init__(self):
         self.prev = None
         self.value = None
-        pass
 
     def ingest(self, event, parent):
         assert isinstance(parent, TenantMetricsVerifier)

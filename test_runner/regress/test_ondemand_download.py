@@ -36,9 +36,7 @@ def get_num_downloaded_layers(client: PageserverHttpClient):
             "status": "success",
         },
     )
-    if value is None:
-        return 0
-    return int(value)
+    return 0 if value is None else int(value)
 
 
 #

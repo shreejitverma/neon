@@ -31,10 +31,9 @@ def remote_consistent_lsn(
         # a timeline, before any part of it has been uploaded to remote
         # storage yet.
         return Lsn(0)
-    else:
-        lsn_str = detail["remote_consistent_lsn"]
-        assert isinstance(lsn_str, str)
-        return Lsn(lsn_str)
+    lsn_str = detail["remote_consistent_lsn"]
+    assert isinstance(lsn_str, str)
+    return Lsn(lsn_str)
 
 
 def wait_for_upload(
@@ -55,9 +54,7 @@ def wait_for_upload(
         )
         time.sleep(1)
     raise Exception(
-        "timed out while waiting for remote_consistent_lsn to reach {}, was {}".format(
-            lsn, current_lsn
-        )
+        f"timed out while waiting for remote_consistent_lsn to reach {lsn}, was {current_lsn}"
     )
 
 
@@ -105,13 +102,14 @@ def wait_until_timeline_state(
         try:
             timeline = pageserver_http.timeline_detail(tenant_id=tenant_id, timeline_id=timeline_id)
             log.debug(f"Timeline {tenant_id}/{timeline_id} data: {timeline}")
-            if isinstance(timeline["state"], str):
-                if timeline["state"] == expected_state:
-                    return timeline
-            elif isinstance(timeline, Dict):
-                if timeline["state"].get(expected_state):
-                    return timeline
-
+            if (
+                isinstance(timeline["state"], str)
+                and timeline["state"] == expected_state
+                or not isinstance(timeline["state"], str)
+                and isinstance(timeline, Dict)
+                and timeline["state"].get(expected_state)
+            ):
+                return timeline
         except Exception as e:
             log.debug(f"Timeline {tenant_id}/{timeline_id} state retrieval failure: {e}")
 
@@ -163,13 +161,11 @@ def wait_for_last_record_lsn(
             return current_lsn
         if i % 10 == 0:
             log.info(
-                "waiting for last_record_lsn to reach {}, now {}, iteration {}".format(
-                    lsn, current_lsn, i + 1
-                )
+                f"waiting for last_record_lsn to reach {lsn}, now {current_lsn}, iteration {i + 1}"
             )
         time.sleep(0.1)
     raise Exception(
-        "timed out while waiting for last_record_lsn to reach {}, was {}".format(lsn, current_lsn)
+        f"timed out while waiting for last_record_lsn to reach {lsn}, was {current_lsn}"
     )
 
 
@@ -281,20 +277,12 @@ def list_prefix(
     assert remote.client is not None
 
     prefix_in_bucket = remote.prefix_in_bucket or ""
-    if not prefix:
-        prefix = prefix_in_bucket
-    else:
-        # real s3 tests have uniqie per test prefix
-        # mock_s3 tests use special pageserver prefix for pageserver stuff
-        prefix = "/".join((prefix_in_bucket, prefix))
-
-    # Note that this doesnt use pagination, so list is not guaranteed to be exhaustive.
-    response = remote.client.list_objects_v2(
+    prefix = "/".join((prefix_in_bucket, prefix)) if prefix else prefix_in_bucket
+    return remote.client.list_objects_v2(
         Delimiter=delimiter,
         Bucket=remote.bucket_name,
         Prefix=prefix,
     )
-    return response
 
 
 def wait_tenant_status_404(

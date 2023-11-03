@@ -636,7 +636,7 @@ def test_empty_branch_remote_storage_upload(neon_env_builder: NeonEnvBuilder):
             client.timeline_list(env.initial_tenant),
         )
     )
-    expected_timelines = set([env.initial_timeline, new_branch_timeline_id])
+    expected_timelines = {env.initial_timeline, new_branch_timeline_id}
     assert (
         timelines_before_detach == expected_timelines
     ), f"Expected to have an initial timeline and the branch timeline only, but got {timelines_before_detach}"
@@ -918,9 +918,7 @@ def get_queued_count(
         file_kind,
         op_kind,
     )
-    if val is None:
-        return val
-    return int(val)
+    return val if val is None else int(val)
 
 
 def assert_nothing_to_upload(

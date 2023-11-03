@@ -23,7 +23,7 @@ def test_read_validation(neon_simple_env: NeonEnv):
     with closing(endpoint.connect()) as con:
         with con.cursor() as c:
             for e in extensions:
-                c.execute("create extension if not exists {};".format(e))
+                c.execute(f"create extension if not exists {e};")
 
             c.execute("create table foo (c int) with (autovacuum_enabled = false)")
             c.execute("insert into foo values (1)")
@@ -43,14 +43,13 @@ def test_read_validation(neon_simple_env: NeonEnv):
             log.info("Test table is populated, validating buffer cache")
 
             cache_entries = query_scalar(
-                c, "select count(*) from pg_buffercache where relfilenode =  {}".format(relfilenode)
+                c,
+                f"select count(*) from pg_buffercache where relfilenode =  {relfilenode}",
             )
             assert cache_entries > 0, "No buffers cached for the test relation"
 
             c.execute(
-                "select reltablespace, reldatabase, relfilenode from pg_buffercache where relfilenode = {}".format(
-                    relfilenode
-                )
+                f"select reltablespace, reldatabase, relfilenode from pg_buffercache where relfilenode = {relfilenode}"
             )
             reln = c.fetchone()
             assert reln is not None
@@ -60,22 +59,22 @@ def test_read_validation(neon_simple_env: NeonEnv):
             c.execute("select clear_buffer_cache()")
 
             cache_entries = query_scalar(
-                c, "select count(*) from pg_buffercache where relfilenode =  {}".format(relfilenode)
+                c,
+                f"select count(*) from pg_buffercache where relfilenode =  {relfilenode}",
             )
             assert cache_entries == 0, "Failed to clear buffer cache"
 
             log.info("Cache is clear, reading stale page version")
 
             c.execute(
-                "select lsn, lower, upper from page_header(get_raw_page_at_lsn('foo', 'main', 0, '{}'))".format(
-                    first[0]
-                )
+                f"select lsn, lower, upper from page_header(get_raw_page_at_lsn('foo', 'main', 0, '{first[0]}'))"
             )
             direct_first = c.fetchone()
             assert first == direct_first, "Failed fetch page at historic lsn"
 
             cache_entries = query_scalar(
-                c, "select count(*) from pg_buffercache where relfilenode =  {}".format(relfilenode)
+                c,
+                f"select count(*) from pg_buffercache where relfilenode =  {relfilenode}",
             )
             assert cache_entries == 0, "relation buffers detected after invalidation"
 
@@ -88,7 +87,8 @@ def test_read_validation(neon_simple_env: NeonEnv):
             assert second == direct_latest, "Failed fetch page at latest lsn"
 
             cache_entries = query_scalar(
-                c, "select count(*) from pg_buffercache where relfilenode =  {}".format(relfilenode)
+                c,
+                f"select count(*) from pg_buffercache where relfilenode =  {relfilenode}",
             )
             assert cache_entries == 0, "relation buffers detected after invalidation"
 
@@ -97,9 +97,7 @@ def test_read_validation(neon_simple_env: NeonEnv):
             )
 
             c.execute(
-                "select lsn, lower, upper from page_header(get_raw_page_at_lsn( {}, {}, {}, 0, 0, '{}' ))".format(
-                    reln[0], reln[1], reln[2], first[0]
-                )
+                f"select lsn, lower, upper from page_header(get_raw_page_at_lsn( {reln[0]}, {reln[1]}, {reln[2]}, 0, 0, '{first[0]}' ))"
             )
             direct_first = c.fetchone()
             assert first == direct_first, "Failed fetch page at historic lsn using oid"
@@ -109,9 +107,7 @@ def test_read_validation(neon_simple_env: NeonEnv):
             )
 
             c.execute(
-                "select lsn, lower, upper from page_header(get_raw_page_at_lsn( {}, {}, {}, 0, 0, NULL ))".format(
-                    reln[0], reln[1], reln[2]
-                )
+                f"select lsn, lower, upper from page_header(get_raw_page_at_lsn( {reln[0]}, {reln[1]}, {reln[2]}, 0, 0, NULL ))"
             )
             direct_latest = c.fetchone()
             assert second == direct_latest, "Failed fetch page at latest lsn"
@@ -123,9 +119,7 @@ def test_read_validation(neon_simple_env: NeonEnv):
             )
 
             c.execute(
-                "select lsn, lower, upper from page_header(get_raw_page_at_lsn( {}, {}, {}, 0, 0, '{}' ))".format(
-                    reln[0], reln[1], reln[2], first[0]
-                )
+                f"select lsn, lower, upper from page_header(get_raw_page_at_lsn( {reln[0]}, {reln[1]}, {reln[2]}, 0, 0, '{first[0]}' ))"
             )
             direct_first = c.fetchone()
             assert first == direct_first, "Failed fetch page at historic lsn using oid"
@@ -135,7 +129,7 @@ def test_read_validation(neon_simple_env: NeonEnv):
                 c.execute("select * from page_header(get_raw_page('foo', 'main', 0));")
                 raise AssertionError("query should have failed")
             except UndefinedTable as e:
-                log.info("Caught an expected failure: {}".format(e))
+                log.info(f"Caught an expected failure: {e}")
 
 
 def test_read_validation_neg(neon_simple_env: NeonEnv):
@@ -150,7 +144,7 @@ def test_read_validation_neg(neon_simple_env: NeonEnv):
     with closing(endpoint.connect()) as con:
         with con.cursor() as c:
             for e in extensions:
-                c.execute("create extension if not exists {};".format(e))
+                c.execute(f"create extension if not exists {e};")
 
             log.info("read a page of a missing relation")
             try:
@@ -159,7 +153,7 @@ def test_read_validation_neg(neon_simple_env: NeonEnv):
                 )
                 raise AssertionError("query should have failed")
             except UndefinedTable as e:
-                log.info("Caught an expected failure: {}".format(e))
+                log.info(f"Caught an expected failure: {e}")
 
             c.execute("create table foo (c int) with (autovacuum_enabled = false)")
             c.execute("insert into foo values (1)")
@@ -171,7 +165,7 @@ def test_read_validation_neg(neon_simple_env: NeonEnv):
                 )
                 raise AssertionError("query should have failed")
             except IoError as e:
-                log.info("Caught an expected failure: {}".format(e))
+                log.info(f"Caught an expected failure: {e}")
 
             log.info("Pass NULL as an input")
             expected = (None, None, None)

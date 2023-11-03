@@ -92,8 +92,9 @@ def test_basic_eviction(
         client.evict_layer(
             tenant_id=tenant_id, timeline_id=timeline_id, layer_name=local_layer.name
         )
-        assert not any(
-            new_local_layer.name == local_layer.name for new_local_layer in timeline_path.glob("*")
+        assert all(
+            new_local_layer.name != local_layer.name
+            for new_local_layer in timeline_path.glob("*")
         ), f"Did not expect to find {local_layer} layer after evicting"
 
     empty_layers = list(filter(lambda path: path.name != "metadata", timeline_path.glob("*")))
@@ -249,7 +250,7 @@ def test_gc_of_remote_layers(neon_env_builder: NeonEnvBuilder):
     def ensure_resident_and_remote_size_metrics():
         resident_layers = list(env.pageserver.timeline_dir(tenant_id, timeline_id).glob("*-*_*"))
         # we have disabled all background loops, so, this should hold
-        assert len(resident_layers) == 0, "ensure that all the layers are gone"
+        assert not resident_layers, "ensure that all the layers are gone"
 
         info = ps_http.layer_map_info(tenant_id, timeline_id)
         log.info("layer map dump: %s", info)
@@ -287,8 +288,12 @@ def test_gc_of_remote_layers(neon_env_builder: NeonEnvBuilder):
     post_gc_info = ps_http.layer_map_info(tenant_id, timeline_id)
     log.info("layer map dump: %s", post_gc_info)
     log.info("by kind: %s", post_gc_info.kind_count())
-    pre_evict_layers = set([layer.layer_file_name for layer in pre_evict_info.historic_layers])
-    post_gc_layers = set([layer.layer_file_name for layer in post_gc_info.historic_layers])
+    pre_evict_layers = {
+        layer.layer_file_name for layer in pre_evict_info.historic_layers
+    }
+    post_gc_layers = {
+        layer.layer_file_name for layer in post_gc_info.historic_layers
+    }
     assert post_gc_layers.issubset(pre_evict_layers)
     assert len(post_gc_layers) < len(pre_evict_layers)
 

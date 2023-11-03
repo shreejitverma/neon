@@ -61,7 +61,8 @@ def subprocess_capture(
     stdout_filename = f"{basepath}.stdout"
     stderr_filename = f"{basepath}.stderr"
 
-    # Since we will stream stdout and stderr concurrently, need to do it in a thread.
+
+
     class OutputHandler(threading.Thread):
         def __init__(self, in_file, out_file, echo: bool, capture: bool):
             super().__init__()
@@ -77,13 +78,14 @@ def subprocess_capture(
                 if self.echo or self.capture:
                     string = line.decode(encoding="utf-8", errors="replace")
 
-                    if self.echo:
-                        log.info(string)
+                if self.echo:
+                    log.info(string)
 
-                    if self.capture:
-                        self.captured += string
+                if self.capture:
+                    self.captured += string
 
                 self.out_file.write(line)
+
 
     captured = None
     try:
@@ -167,11 +169,8 @@ def get_dir_size(path: str) -> int:
     totalbytes = 0
     for root, _dirs, files in os.walk(path):
         for name in files:
-            try:
+            with contextlib.suppress(FileNotFoundError):
                 totalbytes += os.path.getsize(os.path.join(root, name))
-            except FileNotFoundError:
-                pass  # file could be concurrently removed
-
     return totalbytes
 
 
@@ -377,7 +376,7 @@ def wait_until(number_of_iterations: int, interval: float, func: Fn):
             time.sleep(interval)
             continue
         return res
-    raise Exception("timed out while waiting for %s" % func) from last_exception
+    raise Exception(f"timed out while waiting for {func}") from last_exception
 
 
 def run_pg_bench_small(pg_bin: "PgBin", connstr: str):

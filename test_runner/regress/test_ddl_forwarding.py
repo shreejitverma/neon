@@ -254,10 +254,10 @@ def test_ddl_forwarding(ddl: DdlForwardingContext):
 def assert_db_connlimit(endpoint: Any, db_name: str, connlimit: int, msg: str):
     with endpoint.cursor() as cur:
         cur.execute("SELECT datconnlimit FROM pg_database WHERE datname = %s", (db_name,))
-        result = cur.fetchone()
-        if not result:
+        if result := cur.fetchone():
+            assert result[0] == connlimit, msg
+        else:
             raise AssertionError(f"Database '{db_name}' not found")
-        assert result[0] == connlimit, msg
 
 
 # Test that compute_ctl can deal with invalid databases (drop them).
@@ -308,7 +308,7 @@ def test_ddl_forwarding_invalid_db(neon_simple_env: NeonEnv):
     # Should be cleaned up by compute_ctl during full configuration
     with endpoint.cursor() as cur:
         cur.execute("SELECT count(*) FROM pg_database WHERE datname = 'failure'")
-        result = cur.fetchone()
-        if not result:
+        if result := cur.fetchone():
+            assert result[0] == 0, "Database 'failure' still exists after restart"
+        else:
             raise AssertionError("Could not count databases")
-        assert result[0] == 0, "Database 'failure' still exists after restart"

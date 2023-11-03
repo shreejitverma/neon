@@ -22,6 +22,8 @@ def test_large_schema(neon_env_builder: NeonEnvBuilder):
 
     tables = 2  # 10 is too much for debug build
     partitions = 1000
+    retry_sleep = 0.5
+    max_retries = 200
     for i in range(1, tables + 1):
         print(f"iteration {i} / {tables}")
 
@@ -33,8 +35,6 @@ def test_large_schema(neon_env_builder: NeonEnvBuilder):
         # env.pageserver.start()
         endpoint.start()
 
-        retry_sleep = 0.5
-        max_retries = 200
         retries = 0
         while True:
             try:
@@ -54,13 +54,12 @@ def test_large_schema(neon_env_builder: NeonEnvBuilder):
                 # restart, and for the connection to fail until it does. It
                 # should eventually recover, so retry until it succeeds.
                 print(f"failed: {error}")
-                if retries < max_retries:
-                    retries += 1
-                    print(f"retry {retries} / {max_retries}")
-                    time.sleep(retry_sleep)
-                    continue
-                else:
+                if retries >= max_retries:
                     raise
+                retries += 1
+                print(f"retry {retries} / {max_retries}")
+                time.sleep(retry_sleep)
+                continue
             break
 
     conn = endpoint.connect()
@@ -74,9 +73,7 @@ def test_large_schema(neon_env_builder: NeonEnvBuilder):
     cur.execute("select * from pg_depend order by refclassid, refobjid, refobjsubid")
 
     # Check layer file sizes
-    timeline_path = "{}/tenants/{}/timelines/{}/".format(
-        env.pageserver.workdir, env.initial_tenant, env.initial_timeline
-    )
+    timeline_path = f"{env.pageserver.workdir}/tenants/{env.initial_tenant}/timelines/{env.initial_timeline}/"
     for filename in os.listdir(timeline_path):
         if filename.startswith("00000"):
             log.info(f"layer {filename} size is {os.path.getsize(timeline_path + filename)}")

@@ -35,7 +35,7 @@ from pytest_lazyfixture import lazy_fixture
     ],
 )
 def test_seqscans(env: PgCompare, scale: int, rows: int, iters: int, workers: int):
-    rows = scale * rows
+    rows *= scale
 
     with closing(env.pg.connect(options="-cstatement_timeout=0")) as conn:
         with conn.cursor() as cur:

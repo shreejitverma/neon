@@ -25,7 +25,7 @@ def test_read_request_tracing(neon_env_builder: NeonEnvBuilder):
     with closing(endpoint.connect()) as conn:
         with conn.cursor() as cur:
             cur.execute("create table t (i integer);")
-            cur.execute(f"insert into t values (generate_series(1,{10000}));")
+            cur.execute('insert into t values (generate_series(1,10000));')
             cur.execute("select count(*) from t;")
             current_lsn = Lsn(query_scalar(cur, "SELECT pg_current_wal_flush_lsn()"))
     # wait until pageserver receives that data

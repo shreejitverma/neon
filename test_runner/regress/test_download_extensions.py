@@ -40,9 +40,7 @@ def cleanup(pg_version):
     all_glob_paths = cleanup_lib_glob_paths + cleanup_ext_glob_paths
     all_cleanup_files = []
     for file_glob in all_glob_paths:
-        for file in file_glob:
-            all_cleanup_files.append(file)
-
+        all_cleanup_files.extend(iter(file_glob))
     for file in all_cleanup_files:
         try:
             os.remove(file)
