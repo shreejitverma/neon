@@ -137,18 +137,17 @@ def test_backpressure_received_lsn_lag(neon_env_builder: NeonEnvBuilder):
                 cur.execute("INSERT INTO foo select from generate_series(1, 100000)")
                 rows_inserted += 100000
             except Exception as e:
-                if check_thread.is_alive():
-                    log.info("stopping check thread")
-                    check_stop_event.set()
-                    check_thread.join()
-                    raise AssertionError(
-                        f"Exception {e} while inserting rows, but WAL lag is within configured threshold. That means backpressure is not tuned properly"
-                    ) from e
-                else:
+                if not check_thread.is_alive():
                     raise AssertionError(
                         f"Exception {e} while inserting rows and WAL lag overflowed configured threshold. That means backpressure doesn't work."
                     ) from e
 
+                log.info("stopping check thread")
+                check_stop_event.set()
+                check_thread.join()
+                raise AssertionError(
+                    f"Exception {e} while inserting rows, but WAL lag is within configured threshold. That means backpressure is not tuned properly"
+                ) from e
         log.info(f"inserted {rows_inserted} rows")
 
     if check_thread.is_alive():

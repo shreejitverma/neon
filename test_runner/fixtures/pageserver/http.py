@@ -230,7 +230,7 @@ class PageserverHttpClient(requests.Session):
             config = config or {}
             body = {"config": config}
             if generation is not None:
-                body.update({"generation": generation})
+                body["generation"] = generation
 
         res = self.post(
             f"http://localhost:{self.port}/v1/tenant/{tenant_id}/attach",
@@ -450,8 +450,7 @@ class PageserverHttpClient(requests.Session):
             f"http://localhost:{self.port}/v1/tenant/{tenant_id}/timeline/{timeline_id}/get_lsn_by_timestamp?timestamp={timestamp}&version={version}",
         )
         self.verbose_error(res)
-        res_json = res.json()
-        return res_json
+        return res.json()
 
     def timeline_get_timestamp_of_lsn(self, tenant_id: TenantId, timeline_id: TimelineId, lsn: Lsn):
         log.info(f"Requesting time range of lsn {lsn}, tenant {tenant_id}, timeline {timeline_id}")
@@ -459,8 +458,7 @@ class PageserverHttpClient(requests.Session):
             f"http://localhost:{self.port}/v1/tenant/{tenant_id}/timeline/{timeline_id}/get_timestamp_of_lsn?lsn={lsn}",
         )
         self.verbose_error(res)
-        res_json = res.json()
-        return res_json
+        return res.json()
 
     def timeline_checkpoint(self, tenant_id: TenantId, timeline_id: TimelineId):
         self.is_testing_enabled_or_skip()
@@ -575,8 +573,8 @@ class PageserverHttpClient(requests.Session):
             filter={
                 "tenant_id": str(tenant_id),
                 "timeline_id": str(timeline_id),
-                "file_kind": str(file_kind),
-                "op_kind": str(op_kind),
+                "file_kind": file_kind,
+                "op_kind": op_kind,
             },
         )
         if len(matches) == 0:

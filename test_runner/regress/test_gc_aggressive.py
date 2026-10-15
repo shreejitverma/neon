@@ -124,13 +124,7 @@ def test_gc_index_upload(neon_env_builder: NeonEnvBuilder):
     def get_num_remote_ops(file_kind: str, op_kind: str) -> int:
         ps_metrics = env.pageserver.http_client().get_metrics()
         total = 0.0
-        for sample in ps_metrics.query_all(
-            name="pageserver_remote_operation_seconds_count",
-            filter={
-                "file_kind": str(file_kind),
-                "op_kind": str(op_kind),
-            },
-        ):
+        for sample in ps_metrics.query_all(name="pageserver_remote_operation_seconds_count", filter={"file_kind": file_kind, "op_kind": op_kind}):
             total += sample[2]
         return int(total)
 

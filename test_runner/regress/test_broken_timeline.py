@@ -120,7 +120,7 @@ def test_timeline_init_break_before_checkpoint(neon_env_builder: NeonEnvBuilder)
 
     timelines_dir = env.pageserver.timeline_dir(tenant_id)
     old_tenant_timelines = env.neon_cli.list_timelines(tenant_id)
-    initial_timeline_dirs = [d for d in timelines_dir.iterdir()]
+    initial_timeline_dirs = list(timelines_dir.iterdir())
 
     # Introduce failpoint during timeline init (some intermediate files are on disk), before it's checkpointed.
     pageserver_http.configure_failpoints(("before-checkpoint-new-timeline", "return"))
@@ -136,7 +136,7 @@ def test_timeline_init_break_before_checkpoint(neon_env_builder: NeonEnvBuilder)
         new_tenant_timelines == old_tenant_timelines
     ), f"Pageserver after restart should ignore non-initialized timelines for tenant {tenant_id}"
 
-    timeline_dirs = [d for d in timelines_dir.iterdir()]
+    timeline_dirs = list(timelines_dir.iterdir())
     assert (
         timeline_dirs == initial_timeline_dirs
     ), "pageserver should clean its temp timeline files on timeline creation failure"
@@ -150,7 +150,7 @@ def test_timeline_create_break_after_uninit_mark(neon_env_builder: NeonEnvBuilde
 
     timelines_dir = env.pageserver.timeline_dir(tenant_id)
     old_tenant_timelines = env.neon_cli.list_timelines(tenant_id)
-    initial_timeline_dirs = [d for d in timelines_dir.iterdir()]
+    initial_timeline_dirs = list(timelines_dir.iterdir())
 
     # Introduce failpoint when creating a new timeline uninit mark, before any other files were created
     pageserver_http.configure_failpoints(("after-timeline-uninit-mark-creation", "return"))
@@ -164,7 +164,7 @@ def test_timeline_create_break_after_uninit_mark(neon_env_builder: NeonEnvBuilde
         new_tenant_timelines == old_tenant_timelines
     ), f"Pageserver after restart should ignore non-initialized timelines for tenant {tenant_id}"
 
-    timeline_dirs = [d for d in timelines_dir.iterdir()]
+    timeline_dirs = list(timelines_dir.iterdir())
     assert (
         timeline_dirs == initial_timeline_dirs
     ), "pageserver should clean its temp timeline files on timeline creation failure"

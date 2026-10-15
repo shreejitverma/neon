@@ -74,9 +74,7 @@ class EvictionEnv:
     pgbench_init_lsns: Dict[TenantId, Lsn]
 
     def timelines_du(self) -> Tuple[int, int, int]:
-        return poor_mans_du(
-            self.neon_env, [(tid, tlid) for tid, tlid in self.timelines], verbose=False
-        )
+        return poor_mans_du(self.neon_env, list(self.timelines), verbose=False)
 
     def du_by_timeline(self) -> Dict[Tuple[TenantId, TimelineId], int]:
         return {
@@ -221,7 +219,7 @@ def eviction_env(request, neon_env_builder: NeonEnvBuilder, pg_bin: PgBin) -> Ev
             len(layers.historic_layers) >= 10
         ), "evictions happen at layer granularity, but we often assert at byte-granularity"
 
-    eviction_env = EvictionEnv(
+    return EvictionEnv(
         timelines=timelines,
         neon_env=env,
         pageserver_http=pageserver_http,
@@ -229,8 +227,6 @@ def eviction_env(request, neon_env_builder: NeonEnvBuilder, pg_bin: PgBin) -> Ev
         pg_bin=pg_bin,
         pgbench_init_lsns=pgbench_init_lsns,
     )
-
-    return eviction_env
 
 
 def test_broken_tenants_are_skipped(eviction_env: EvictionEnv):
@@ -267,7 +263,7 @@ def test_broken_tenants_are_skipped(eviction_env: EvictionEnv):
     assert broken_size_pre == broken_size_post, "broken tenant should not be touched"
     assert healthy_size_post < healthy_size_pre
     assert healthy_size_post == 0
-    env.neon_env.pageserver.allowed_errors.append(".*" + GLOBAL_LRU_LOG_LINE)
+    env.neon_env.pageserver.allowed_errors.append(f".*{GLOBAL_LRU_LOG_LINE}")
 
 
 def test_pageserver_evicts_until_pressure_is_relieved(eviction_env: EvictionEnv):
@@ -386,7 +382,7 @@ def test_pageserver_falls_back_to_global_lru(eviction_env: EvictionEnv):
 
     time.sleep(1)  # give log time to flush
     assert env.neon_env.pageserver.log_contains(GLOBAL_LRU_LOG_LINE)
-    env.neon_env.pageserver.allowed_errors.append(".*" + GLOBAL_LRU_LOG_LINE)
+    env.neon_env.pageserver.allowed_errors.append(f".*{GLOBAL_LRU_LOG_LINE}")
 
 
 def test_partial_evict_tenant(eviction_env: EvictionEnv):
@@ -472,10 +468,7 @@ def poor_mans_du(
             size = file.stat().st_size
             total += size
             largest_layer = max(largest_layer, size)
-            if smallest_layer:
-                smallest_layer = min(smallest_layer, size)
-            else:
-                smallest_layer = size
+            smallest_layer = min(smallest_layer, size) if smallest_layer else size
             if verbose:
                 log.info(f"{tenant_id}/{timeline_id} => {file.name} {size} ({human_bytes(size)})")
 

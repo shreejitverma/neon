@@ -695,7 +695,7 @@ class ProposerPostgres(PgProtocol):
 
         log.info(f"postgres --sync-safekeepers output: {basepath}")
 
-        stdout_filename = basepath + ".stdout"
+        stdout_filename = f"{basepath}.stdout"
 
         with open(stdout_filename, "r") as stdout_f:
             stdout = stdout_f.read()
@@ -791,7 +791,6 @@ def test_timeline_status(neon_env_builder: NeonEnvBuilder, auth_enabled: bool):
         wa_http_cli.check_status()
 
         wa_http_cli_debug = wa.http_client()
-        wa_http_cli_debug.check_status()
     else:
         wa_http_cli = wa.http_client(auth_token=env.auth_keys.generate_tenant_token(tenant_id))
         wa_http_cli.check_status()
@@ -804,8 +803,7 @@ def test_timeline_status(neon_env_builder: NeonEnvBuilder, auth_enabled: bool):
 
         # debug endpoint requires safekeeper scope
         wa_http_cli_debug = wa.http_client(auth_token=env.auth_keys.generate_safekeeper_token())
-        wa_http_cli_debug.check_status()
-
+    wa_http_cli_debug.check_status()
     # create a dummy table to wait for timeline initialization in safekeeper
     endpoint.safe_psql("create table wait_for_sk()")
 
@@ -1106,13 +1104,13 @@ def test_peer_recovery(neon_env_builder: NeonEnvBuilder):
     for f in mismatch:
         f1 = os.path.join(sk1.timeline_dir(tenant_id, timeline_id), f)
         f2 = os.path.join(sk2.timeline_dir(tenant_id, timeline_id), f)
-        stdout_filename = "{}.filediff".format(f2)
+        stdout_filename = f"{f2}.filediff"
 
         with open(stdout_filename, "w") as stdout_f:
-            subprocess.run("xxd {} > {}.hex ".format(f1, f1), shell=True)
-            subprocess.run("xxd {} > {}.hex ".format(f2, f2), shell=True)
+            subprocess.run(f"xxd {f1} > {f1}.hex ", shell=True)
+            subprocess.run(f"xxd {f2} > {f2}.hex ", shell=True)
 
-            cmd = "diff {}.hex {}.hex".format(f1, f2)
+            cmd = f"diff {f1}.hex {f2}.hex"
             subprocess.run([cmd], stdout=stdout_f, shell=True)
 
     assert (mismatch, not_regular) == ([], [])
@@ -1157,9 +1155,9 @@ class SafekeeperEnv:
 
         # Create config and a Safekeeper object for each safekeeper
         self.safekeepers = []
-        for i in range(1, self.num_safekeepers + 1):
-            self.safekeepers.append(self.start_safekeeper(i))
-
+        self.safekeepers.extend(
+            self.start_safekeeper(i) for i in range(1, self.num_safekeepers + 1)
+        )
         # Create and start postgres
         self.postgres = self.create_postgres()
         self.postgres.start()
@@ -1196,10 +1194,12 @@ class SafekeeperEnv:
             auth_token=None,
         )
         try:
-            safekeeper_process = start_in_background(
-                cmd, safekeeper_dir, "safekeeper.log", safekeeper_client.check_status
+            return start_in_background(
+                cmd,
+                safekeeper_dir,
+                "safekeeper.log",
+                safekeeper_client.check_status,
             )
-            return safekeeper_process
         except Exception as e:
             log.error(e)
             safekeeper_process.kill()

@@ -150,8 +150,10 @@ def combinations():
         remotes.append(RemoteStorageKind.REAL_S3)
 
     for remote_storage_kind in remotes:
-        for delete_failpoint in DELETE_FAILPOINTS:
-            result.append((remote_storage_kind, delete_failpoint))
+        result.extend(
+            (remote_storage_kind, delete_failpoint)
+            for delete_failpoint in DELETE_FAILPOINTS
+        )
     return result
 
 
@@ -237,10 +239,10 @@ def test_delete_timeline_exercise_crash_safety_failpoints(
 
     # These failpoints are earlier than background task is spawned.
     # so they result in api request failure.
-    if failpoint in (
+    if failpoint in {
         "timeline-delete-before-index-deleted-at",
         "timeline-delete-before-schedule",
-    ):
+    }:
         with pytest.raises(PageserverApiException, match=failpoint):
             ps_http.timeline_delete(env.initial_tenant, timeline_id)
 
@@ -266,7 +268,21 @@ def test_delete_timeline_exercise_crash_safety_failpoints(
 
         wait_until_tenant_active(ps_http, env.initial_tenant, iterations=iterations)
 
-        if failpoint == "timeline-delete-before-index-deleted-at":
+        if failpoint == "timeline-delete-after-index-delete":
+            # Pageserver should've resumed deletion after restart.
+            wait_timeline_detail_404(
+                ps_http, env.initial_tenant, timeline_id, iterations=iterations
+            )
+
+            m = ps_http.get_metrics()
+            assert (
+                m.query_one(
+                    "remote_storage_s3_request_seconds_count",
+                    filter={"request_type": "get_object", "result": "ok"},
+                ).value
+                == 1  # index part for initial timeline
+            )
+        elif failpoint == "timeline-delete-before-index-deleted-at":
             # We crashed before persisting this to remote storage, need to retry delete request
             timeline_delete_wait_completed(ps_http, env.initial_tenant, timeline_id)
         else:
@@ -275,15 +291,6 @@ def test_delete_timeline_exercise_crash_safety_failpoints(
                 ps_http, env.initial_tenant, timeline_id, iterations=iterations
             )
 
-            if failpoint == "timeline-delete-after-index-delete":
-                m = ps_http.get_metrics()
-                assert (
-                    m.query_one(
-                        "remote_storage_s3_request_seconds_count",
-                        filter={"request_type": "get_object", "result": "ok"},
-                    ).value
-                    == 1  # index part for initial timeline
-                )
     elif check is Check.RETRY_WITHOUT_RESTART:
         # this should succeed
         # this also checks that delete can be retried even when timeline is in Broken state
@@ -377,9 +384,6 @@ def test_timeline_resurrection_on_attach(
                 log.info("waiting for checkpoint upload")
                 wait_for_upload(ps_http, tenant_id, branch_timeline_id, current_lsn)
                 log.info("upload of checkpoint is done")
-    else:
-        pass
-
     # delete new timeline
     timeline_delete_wait_completed(ps_http, tenant_id=tenant_id, timeline_id=branch_timeline_id)
 
@@ -402,7 +406,7 @@ def test_timeline_resurrection_on_attach(
     assert {TimelineId(tl["timeline_id"]) for tl in timelines} == {
         main_timeline_id
     }, "the deleted timeline should not have been resurrected"
-    assert all([tl["state"] == "Active" for tl in timelines])
+    assert all(tl["state"] == "Active" for tl in timelines)
 
 
 def test_timeline_delete_fail_before_local_delete(neon_env_builder: NeonEnvBuilder):
@@ -469,7 +473,7 @@ def test_timeline_delete_fail_before_local_delete(neon_env_builder: NeonEnvBuild
         intermediate_timeline_id,
         env.initial_timeline,
     }, "other timelines should not have been affected"
-    assert all([tl["state"] == "Active" for tl in timelines])
+    assert all(tl["state"] == "Active" for tl in timelines)
 
     assert_prefix_empty(
         neon_env_builder,

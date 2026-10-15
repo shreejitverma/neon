@@ -147,10 +147,7 @@ def combinations():
         for delete_failpoint in FAILPOINTS:
             # Simulate failures for only one type of remote storage
             # to avoid log pollution and make tests run faster
-            if remote_storage_kind is RemoteStorageKind.MOCK_S3:
-                simulate_failures = True
-            else:
-                simulate_failures = False
+            simulate_failures = remote_storage_kind is RemoteStorageKind.MOCK_S3
             result.append((remote_storage_kind, delete_failpoint, simulate_failures))
     return result
 
@@ -243,10 +240,10 @@ def test_delete_tenant_exercise_crash_safety_failpoints(
     if check is Check.RETRY_WITH_RESTART:
         env.pageserver.restart()
 
-        if failpoint in (
+        if failpoint in {
             "tenant-delete-before-shutdown",
             "tenant-delete-before-create-remote-mark",
-        ):
+        }:
             wait_until_tenant_active(
                 ps_http, tenant_id=tenant_id, iterations=iterations, period=0.25
             )

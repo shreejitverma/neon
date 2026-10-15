@@ -68,9 +68,9 @@ def test_startup_simple(neon_env_builder: NeonEnvBuilder, zenbenchmark: NeonBenc
             value = metrics[key]
             zenbenchmark.record(name, value, "ms", report=MetricReport.LOWER_IS_BETTER)
 
-        # Check basebackup size makes sense
-        basebackup_bytes = metrics["basebackup_bytes"]
         if i > 0:
+            # Check basebackup size makes sense
+            basebackup_bytes = metrics["basebackup_bytes"]
             assert basebackup_bytes < 100 * 1024
 
         # Stop so we can restart

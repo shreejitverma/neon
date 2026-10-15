@@ -191,8 +191,7 @@ async def main_impl(args, report_out, client: Client):
             assert len(tenant_ids) == len(gathered)
             tenant_and_timline_ids = []
             for tid, tlids in zip(tenant_ids, gathered):
-                for tlid in tlids:
-                    tenant_and_timline_ids.append((tid, tlid))
+                tenant_and_timline_ids.extend((tid, tlid) for tlid in tlids)
         elif len(comps) == 1:
             tid = comps[0]
             tlids = await client.get_timeline_ids(tid)
@@ -223,10 +222,10 @@ async def main_impl(args, report_out, client: Client):
         task_q.put_nowait(task)
 
     result_q: asyncio.Queue[Tuple[str, Any]] = asyncio.Queue()
-    taskq_handlers = []
-    for _ in range(0, args.concurrent_tasks):
-        taskq_handlers.append(taskq_handler(task_q, result_q))
-
+    taskq_handlers = [
+        taskq_handler(task_q, result_q)
+        for _ in range(0, args.concurrent_tasks)
+    ]
     print_progress_task = asyncio.create_task(print_progress(result_q, tasks))
 
     await asyncio.gather(*taskq_handlers)
@@ -309,9 +308,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    level = logging.INFO
-    if args.verbose:
-        level = logging.DEBUG
+    level = logging.DEBUG if args.verbose else logging.INFO
     logging.basicConfig(
         format="%(asctime)s,%(msecs)03d %(levelname)-8s [%(filename)s:%(lineno)d] %(message)s",
         datefmt="%Y-%m-%d:%H:%M:%S",

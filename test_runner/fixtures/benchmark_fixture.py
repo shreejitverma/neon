@@ -416,8 +416,7 @@ def zenbenchmark(record_property: Callable[[str, object], None]) -> Iterator[Neo
     This is a python decorator for benchmark fixtures. It contains functions for
     recording measurements, and prints them out at the end.
     """
-    benchmarker = NeonBenchmarker(record_property)
-    yield benchmarker
+    yield NeonBenchmarker(record_property)
 
 
 def pytest_addoption(parser: Parser):
@@ -463,7 +462,7 @@ def pytest_terminal_summary(
                 is_header_printed = True
 
             terminalreporter.write(
-                "{}.{}: ".format(test_report.head_line, recorded_property["name"])
+                f'{test_report.head_line}.{recorded_property["name"]}: '
             )
             unit = recorded_property["unit"]
             value = recorded_property["value"]
@@ -475,7 +474,7 @@ def pytest_terminal_summary(
                 terminalreporter.write("{0:,.4f}".format(value), green=True)
             else:
                 terminalreporter.write(str(value), green=True)
-            terminalreporter.line(" {}".format(unit))
+            terminalreporter.line(f" {unit}")
 
             result_entry.append(recorded_property)
 
